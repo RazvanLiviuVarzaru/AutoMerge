@@ -1,0 +1,112 @@
+name: Reusable forward merge chain health
+
+on:
+  workflow_call:
+    inputs:
+      tool_repository:
+        description: Repository that contains the forward-merge-check tool.
+        required: true
+        type: string
+      tool_ref:
+        description: Ref to checkout from the tool repository.
+        required: false
+        type: string
+        default: main
+      config_path:
+        description: Branch-chain config path inside the tool repository.
+        required: false
+        type: string
+        default: .github/forward-merge-check/repositories/mariadb-server.yml
+      state_cache_key:
+        description: GitHub Actions cache key prefix used to restore and save chain state.
+        required: false
+        type: string
+        default: forward-merge-chain-state
+    secrets:
+      tool_repository_token:
+        description: Optional token for checking out a private tool repository.
+        required: false
+      slack_webhook_url:
+        description: Optional Slack incoming webhook URL.
+        required: false
+      zulip_webhook_url:
+        description: Optional Zulip incoming webhook URL.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  chain-health:
+    runs-on: ubuntu-latest
+    name: Check global forward merge chain
+    concurrency:
+      group: forward-merge-chain-health-${{ github.repository }}-${{ inputs.state_cache_key }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          path: target
+
+      - name: Checkout forward-merge-check tool
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.tool_repository }}
+          ref: ${{ inputs.tool_ref }}
+          path: tool
+          token: ${{ secrets.tool_repository_token || github.token }}
+
+      - name: Fetch branch chain
+        run: |
+          python3 tool/.github/forward-merge-check/scripts/check_forward_mergeability.py \
+            --config-file "tool/${{ inputs.config_path }}" \
+            --print-branches |
+          while IFS= read -r branch; do
+            git -C target fetch --no-tags origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+          done
+
+      - name: Restore previous chain state
+        id: state-cache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: .forward-merge-check-state/state.json
+          key: ${{ inputs.state_cache_key }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ inputs.state_cache_key }}-
+
+      - name: Test branch chain
+        id: chain
+        continue-on-error: true
+        run: |
+          mkdir -p .forward-merge-check-state
+          python3 tool/.github/forward-merge-check/scripts/check_forward_mergeability.py \
+            --repo target \
+            --mode chain-health \
+            --config-file "tool/${{ inputs.config_path }}" \
+            --state-input-file .forward-merge-check-state/state.json \
+            --state-output .forward-merge-check-state/state.json \
+            --notification-output .forward-merge-check-state/notification.json
+
+      - name: Send state-change notifications
+        if: steps.chain.outputs.should_notify == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.slack_webhook_url }}
+          ZULIP_WEBHOOK_URL: ${{ secrets.zulip_webhook_url }}
+        run: |
+          python3 tool/.github/forward-merge-check/scripts/send_chain_notification.py \
+            --notification .forward-merge-check-state/notification.json \
+            --config-file "tool/${{ inputs.config_path }}"
+
+      - name: Save latest chain state
+        if: always() && hashFiles('.forward-merge-check-state/state.json') != ''
+        uses: actions/cache/save@v5
+        with:
+          path: .forward-merge-check-state/state.json
+          key: ${{ inputs.state_cache_key }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Fail workflow when chain is blocked
+        if: steps.chain.outcome == 'failure'
+        run: exit 1
