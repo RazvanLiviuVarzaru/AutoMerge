@@ -92,11 +92,13 @@ When a merge fails, the script reports:
 
 - blocked edge
 - conflicted files
-- first likely source-side commit that introduced the conflict
-- candidate source-side commits that touched conflicted files
+- first likely source-side commit that fails this target merge
+- candidate source-side and target-side commits that touched conflicted files
 
-The "first likely" commit is an approximation. Git conflicts come from the
-interaction between both branches, so this is a debugging hint, not proof.
+Candidate commits come from `git log --left-right --merge` while the repository
+is still in the conflicted merge state. The "first likely" commit is an
+approximation. Git conflicts come from the interaction between both branches, so
+this is a debugging hint, not proof.
 
 ## Repository Model
 

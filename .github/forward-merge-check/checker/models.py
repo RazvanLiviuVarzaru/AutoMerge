@@ -11,6 +11,14 @@ class CommitInfo:
 
 
 @dataclass
+class ConflictCommit:
+    side: str
+    sha: str
+    author: str
+    subject: str
+
+
+@dataclass
 class MergeResult:
     source_label: str
     source_ref: str
@@ -19,7 +27,7 @@ class MergeResult:
     message: str
     conflicted_files: list[str] = field(default_factory=list)
     first_conflicting_commit: Optional[CommitInfo] = None
-    candidate_commits: list[CommitInfo] = field(default_factory=list)
+    candidate_commits: list[ConflictCommit] = field(default_factory=list)
 
 
 class NotificationReason(str, Enum):

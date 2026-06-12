@@ -11,7 +11,7 @@ from .git_ops import (
     remove_worktree,
     require_branch_ref,
 )
-from .models import CommitInfo, MergeResult
+from .models import CommitInfo, ConflictCommit, MergeResult
 
 
 def source_commits(repo: Path, target_ref: str, source_ref: str) -> list[str]:
@@ -27,7 +27,65 @@ def source_commits(repo: Path, target_ref: str, source_ref: str) -> list[str]:
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
 
-def try_merge(repo: Path, base_ref: str, source_ref: str, scratch_root: Path) -> tuple[bool, list[str], Optional[str]]:
+def candidate_commits_for_active_conflict(
+    worktree: Path,
+    limit_per_side: int = 20,
+) -> list[ConflictCommit]:
+    proc = git(
+        worktree,
+        [
+            "log",
+            "--left-right",
+            "--merge",
+            "--format=%m%x00%H%x00%an <%ae>%x00%s",
+        ],
+        check=False,
+    )
+    if proc.returncode != 0:
+        return []
+
+    side_for_marker = {
+        "<": "target",
+        ">": "source",
+    }
+    counts = {"target": 0, "source": 0, "unknown": 0}
+    seen: set[str] = set()
+    candidates: list[ConflictCommit] = []
+
+    for line in proc.stdout.splitlines():
+        parts = line.split("\x00", 3)
+        if len(parts) != 4:
+            continue
+
+        marker, sha, author, subject = parts
+        if sha in seen:
+            continue
+
+        side = side_for_marker.get(marker, "unknown")
+        if counts[side] >= limit_per_side:
+            continue
+
+        seen.add(sha)
+        counts[side] += 1
+        candidates.append(
+            ConflictCommit(
+                side=side,
+                sha=sha,
+                author=author,
+                subject=subject,
+            )
+        )
+
+    return candidates
+
+
+def try_merge(
+    repo: Path,
+    base_ref: str,
+    source_ref: str,
+    scratch_root: Path,
+    collect_conflict_commits: bool = False,
+) -> tuple[bool, list[str], Optional[str], list[ConflictCommit]]:
     worktree = add_worktree(repo, base_ref, scratch_root)
 
     try:
@@ -45,9 +103,15 @@ def try_merge(repo: Path, base_ref: str, source_ref: str, scratch_root: Path) ->
 
         if proc.returncode == 0:
             sha = git(worktree, ["rev-parse", "HEAD"]).stdout.strip()
-            return True, [], sha
+            return True, [], sha, []
 
-        return False, get_conflicted_files(worktree), None
+        conflicted_files = get_conflicted_files(worktree)
+        candidates = (
+            candidate_commits_for_active_conflict(worktree)
+            if collect_conflict_commits
+            else []
+        )
+        return False, conflicted_files, None, candidates
 
     finally:
         git(worktree, ["merge", "--abort"], check=False)
@@ -65,55 +129,22 @@ def find_first_conflicting_commit(
 
     Each source-side non-merge commit is tried independently against the target.
     Git conflicts are produced by both branches together, so this is not a
-    perfect root cause. It is a practical answer to "which introduced commit
+    perfect root cause. It is a practical answer to "which source-side commit
     should I inspect first?" for scheduled chain-health runs too, not only PRs.
     """
     target_ref = require_branch_ref(repo, target)
 
     for sha in source_commits(repo, target_ref, source_ref):
-        ok, _files, _merge_sha = try_merge(repo, target_ref, sha, scratch_root)
+        ok, _files, _merge_sha, _candidates = try_merge(
+            repo,
+            target_ref,
+            sha,
+            scratch_root,
+        )
         if not ok:
             return get_commit_info(repo, sha)
 
     return None
-
-
-def candidate_commits_for_conflicted_files(
-    repo: Path,
-    source_ref: str,
-    target: str,
-    files: list[str],
-    limit_per_file: int = 20,
-) -> list[CommitInfo]:
-    target_ref = require_branch_ref(repo, target)
-    seen: set[str] = set()
-    candidates: list[CommitInfo] = []
-
-    for file_path in files:
-        proc = git(
-            repo,
-            [
-                "log",
-                "--no-merges",
-                "--format=%H",
-                f"{target_ref}..{source_ref}",
-                "--",
-                file_path,
-            ],
-            check=False,
-        )
-
-        for sha in [line.strip() for line in proc.stdout.splitlines() if line.strip()]:
-            if sha in seen:
-                continue
-
-            seen.add(sha)
-            candidates.append(get_commit_info(repo, sha))
-
-            if len(candidates) >= limit_per_file:
-                break
-
-    return candidates
 
 
 def check_merge(
@@ -136,7 +167,13 @@ def check_merge(
             message=f"{source_label} is already contained in {target}.",
         )
 
-    ok, conflicted_files, merge_sha = try_merge(repo, target_ref, source_ref, scratch_root)
+    ok, conflicted_files, merge_sha, candidates = try_merge(
+        repo,
+        target_ref,
+        source_ref,
+        scratch_root,
+        collect_conflict_commits=True,
+    )
 
     if ok:
         assert merge_sha is not None
@@ -154,13 +191,6 @@ def check_merge(
         target=target,
         scratch_root=scratch_root,
     )
-    candidates = candidate_commits_for_conflicted_files(
-        repo=repo,
-        source_ref=source_ref,
-        target=target,
-        files=conflicted_files,
-    )
-
     return MergeResult(
         source_label=source_label,
         source_ref=source_ref,

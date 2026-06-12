@@ -53,18 +53,31 @@ def print_result(result: MergeResult) -> None:
     if result.first_conflicting_commit:
         c = result.first_conflicting_commit
         print()
-        print("First likely source-side commit that introduces the conflict:")
+        print("First likely source-side commit that fails this target merge:")
         print(f"  - {c.sha}")
         print(f"    Author:  {c.author}")
         print(f"    Subject: {c.subject}")
 
     if result.candidate_commits:
         print()
-        print("Candidate source-side commits touching conflicted files:")
-        for c in result.candidate_commits:
-            print(f"  - {c.sha}")
-            print(f"    Author:  {c.author}")
-            print(f"    Subject: {c.subject}")
+        print("Candidate commits touching conflicted files:")
+        side_labels = {
+            "source": f"Source side ({result.source_label})",
+            "target": f"Target side ({result.target})",
+            "unknown": "Unknown side",
+        }
+        for side in ["source", "target", "unknown"]:
+            commits = [
+                commit for commit in result.candidate_commits if commit.side == side
+            ]
+            if not commits:
+                continue
+
+            print(f"  {side_labels[side]}:")
+            for c in commits:
+                print(f"    - {c.sha}")
+                print(f"      Author:  {c.author}")
+                print(f"      Subject: {c.subject}")
 
 
 def print_summary(results: list[MergeResult]) -> None:

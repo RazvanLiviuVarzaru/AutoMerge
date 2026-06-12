@@ -90,6 +90,33 @@ def result_status_icon(status: str) -> str:
     return "⚪"
 
 
+def format_conflict_candidate_commits(blocked: dict, style: str) -> list[str]:
+    candidates = blocked.get("candidate_commits") or []
+    if not candidates:
+        return []
+
+    side_labels = {
+        "source": f"Source side (`{blocked['source_label']}`)",
+        "target": f"Target side (`{blocked['target']}`)",
+        "unknown": "Unknown side",
+    }
+    lines = ["*Candidate commits touching conflicted files:*"]
+
+    for side in ["source", "target", "unknown"]:
+        commits = [commit for commit in candidates if commit.get("side") == side]
+        if not commits:
+            continue
+
+        lines.append(f"- *{side_labels[side]}:*")
+        for commit in commits:
+            short_sha = commit["sha"][:12]
+            commit_label = format_link(github_commit_url(commit["sha"]), short_sha, style)
+            lines.append(f"  - {commit_label} - {commit['subject']}")
+            lines.append(f"    Author: {commit['author']}")
+
+    return lines
+
+
 def format_notification(state: dict, reasons: list[NotificationReason], style: str = "slack") -> str:
     status_text = "✅ healthy"
     if state["status"] == "broken":
@@ -156,5 +183,7 @@ def format_notification(state: dict, reasons: list[NotificationReason], style: s
             lines.append("```")
             lines.extend(f"- {path}" for path in blocked["conflicted_files"])
             lines.append("```")
+
+        lines.extend(format_conflict_candidate_commits(blocked, style))
 
     return "\n".join(lines)

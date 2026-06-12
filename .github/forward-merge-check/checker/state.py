@@ -5,13 +5,22 @@ from pathlib import Path
 from typing import Optional
 
 from .git_ops import branch_head
-from .models import CommitInfo, MergeResult, NotificationReason
+from .models import CommitInfo, ConflictCommit, MergeResult, NotificationReason
 
 
 def commit_to_dict(commit: Optional[CommitInfo]) -> Optional[dict]:
     if commit is None:
         return None
     return {
+        "sha": commit.sha,
+        "author": commit.author,
+        "subject": commit.subject,
+    }
+
+
+def conflict_commit_to_dict(commit: ConflictCommit) -> dict:
+    return {
+        "side": commit.side,
         "sha": commit.sha,
         "author": commit.author,
         "subject": commit.subject,
@@ -27,7 +36,9 @@ def result_to_dict(result: MergeResult) -> dict:
         "message": result.message,
         "conflicted_files": result.conflicted_files,
         "first_conflicting_commit": commit_to_dict(result.first_conflicting_commit),
-        "candidate_commits": [commit_to_dict(commit) for commit in result.candidate_commits],
+        "candidate_commits": [
+            conflict_commit_to_dict(commit) for commit in result.candidate_commits
+        ],
     }
 
 
