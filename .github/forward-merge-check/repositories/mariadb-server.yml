@@ -9,10 +9,13 @@ branches:
   - "10.11"
   - "11.4"
   - "11.8"
+  - "12.3"
+  - "13.0"
+  - "main"
 
 notifications:
   slack:
-    enabled: false
+    enabled: true
     secret: SLACK_WEBHOOK_URL
   zulip:
     enabled: true
