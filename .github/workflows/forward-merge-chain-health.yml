@@ -12,6 +12,10 @@ on:
         required: false
         type: string
         default: main
+      target_repository:
+        description: Repository to checkout and check. Defaults to the workflow caller repository.
+        required: false
+        type: string
       config_path:
         description: Branch-chain config path inside the tool repository.
         required: false
@@ -25,6 +29,9 @@ on:
     secrets:
       tool_repository_token:
         description: Optional token for checking out a private tool repository.
+        required: false
+      target_repository_token:
+        description: Optional token for checking out a private target repository.
         required: false
       slack_webhook_url:
         description: Optional Slack incoming webhook URL.
@@ -41,15 +48,17 @@ jobs:
     runs-on: ubuntu-latest
     name: Check global forward merge chain
     concurrency:
-      group: forward-merge-chain-health-${{ github.repository }}-${{ inputs.state_cache_key }}
+      group: forward-merge-chain-health-${{ inputs.target_repository || github.repository }}-${{ inputs.state_cache_key }}
       cancel-in-progress: false
 
     steps:
       - name: Checkout target repository
         uses: actions/checkout@v6
         with:
+          repository: ${{ inputs.target_repository || github.repository }}
           fetch-depth: 0
           path: target
+          token: ${{ secrets.target_repository_token || github.token }}
 
       - name: Checkout forward-merge-check tool
         uses: actions/checkout@v6
@@ -80,6 +89,8 @@ jobs:
       - name: Test branch chain
         id: chain
         continue-on-error: true
+        env:
+          FORWARD_MERGE_TARGET_REPOSITORY: ${{ inputs.target_repository || github.repository }}
         run: |
           mkdir -p .forward-merge-check-state
           python3 tool/.github/forward-merge-check/scripts/check_forward_mergeability.py \

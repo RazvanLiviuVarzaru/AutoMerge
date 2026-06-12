@@ -5,20 +5,39 @@ from .models import NotificationReason
 
 
 def github_repository_label() -> str:
-    return os.environ.get("GITHUB_REPOSITORY", "unknown repository")
+    return (
+        os.environ.get("FORWARD_MERGE_TARGET_REPOSITORY")
+        or os.environ.get("GITHUB_REPOSITORY")
+        or "unknown repository"
+    )
 
 
-def github_repository_url() -> Optional[str]:
-    repository = os.environ.get("GITHUB_REPOSITORY")
-    if not repository:
-        return None
-
+def repository_url(repository: str) -> str:
     server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
     return f"{server_url}/{repository}"
 
 
+def github_repository_url() -> Optional[str]:
+    repository = (
+        os.environ.get("FORWARD_MERGE_TARGET_REPOSITORY")
+        or os.environ.get("GITHUB_REPOSITORY")
+    )
+    if not repository:
+        return None
+
+    return repository_url(repository)
+
+
+def github_workflow_repository_url() -> Optional[str]:
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not repository:
+        return None
+
+    return repository_url(repository)
+
+
 def github_action_run_url() -> Optional[str]:
-    repository_url = github_repository_url()
+    repository_url = github_workflow_repository_url()
     run_id = os.environ.get("GITHUB_RUN_ID")
     if not repository_url or not run_id:
         return None

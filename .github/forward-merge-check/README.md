@@ -100,9 +100,12 @@ interaction between both branches, so this is a debugging hint, not proof.
 
 ## Repository Model
 
-The target repository calls reusable workflows from this tool repository. Each
-run checks out the target repo as `target/` and this repo as `tool/`, then runs
-scripts from `tool/` against refs in `target/`.
+The target repository normally calls reusable workflows from this tool
+repository. Each run checks out the target repo as `target/` and this repo as
+`tool/`, then runs scripts from `tool/` against refs in `target/`.
+
+The chain-health workflow can also check a repository other than the workflow
+caller by setting `target_repository`.
 
 ## Configuration
 
@@ -157,7 +160,17 @@ YOUR_ORG/forward-branch-merge-check
 config_path: .github/forward-merge-check/repositories/mariadb-server.yml
 ```
 
-If the tool repository is private, add this target-repository secret:
+For chain-health, `target_repository` is optional:
+
+```text
+target_repository: YOUR_ORG/YOUR_TARGET_REPOSITORY
+```
+
+Omit it when the workflow stub runs inside the repository being checked; set it
+when a scheduler or other repository should run chain-health against a different
+checkout target.
+
+If the tool repository is private, add this workflow-caller secret:
 
 ```text
 FORWARD_MERGE_CHECK_TOKEN
@@ -165,6 +178,16 @@ FORWARD_MERGE_CHECK_TOKEN
 
 If the tool repository is public, remove the `tool_repository_token` secret
 mapping from the stubs.
+
+If chain-health checks a private target repository outside the caller
+repository, add a token secret such as:
+
+```text
+TARGET_REPOSITORY_TOKEN
+```
+
+and map it as `target_repository_token`. Omit that mapping when the default
+`GITHUB_TOKEN` can read the target repository.
 
 Placement:
 
@@ -177,7 +200,8 @@ Placement:
 
 Only chain-health sends Slack or Zulip notifications.
 
-State is stored in the target repository's GitHub Actions cache:
+State is stored in the workflow caller repository's GitHub Actions cache
+(normally the target repository):
 
 ```text
 restore prefix: forward-merge-chain-state-
@@ -190,6 +214,9 @@ and may be evicted; if state disappears, the next run behaves like a first run.
 
 The workflow uses a concurrency group so scheduled/manual runs do not compute
 and save state at the same time.
+
+If one caller repository checks multiple target repositories, give each target a
+distinct `state_cache_key`.
 
 Notifications are sent when:
 

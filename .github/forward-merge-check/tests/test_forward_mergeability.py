@@ -480,6 +480,65 @@ class StateTests(unittest.TestCase):
         self.assertIn("should_notify=true", github_lines)
         self.assertIn("status=broken", github_lines)
 
+    def test_write_outputs_uses_target_repository_override_for_notification_links(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            notification_output = Path(tmp) / "notification.json"
+            args = argparse.Namespace(
+                state_output=None,
+                notification_output=notification_output,
+                github_output=None,
+            )
+            state = {
+                "version": 1,
+                "checked_at": "2026-05-11T00:00:00+00:00",
+                "status": "broken",
+                "base_branch": "old",
+                "branches": ["old", "next"],
+                "branch_heads": {"old": "a", "next": "b"},
+                "config_fingerprint": "cfg",
+                "chain_fingerprint": "chain",
+                "health_fingerprint": "health",
+                "results": [
+                    {
+                        "source_label": "old",
+                        "source_ref": "refs/remotes/origin/old",
+                        "target": "next",
+                        "status": "conflict",
+                        "message": "blocked",
+                        "conflicted_files": ["file.txt"],
+                        "first_conflicting_commit": {
+                            "sha": "abc123",
+                            "author": "Tester <tester@example.invalid>",
+                            "subject": "break it",
+                        },
+                        "candidate_commits": [],
+                    }
+                ],
+            }
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "FORWARD_MERGE_TARGET_REPOSITORY": "target/repo",
+                    "GITHUB_REPOSITORY": "owner/workflow-runner",
+                    "GITHUB_RUN_ID": "12345",
+                    "GITHUB_SERVER_URL": "https://github.example",
+                },
+                clear=False,
+            ):
+                check.write_outputs(args, state, [check.NotificationReason.BROKEN])
+            notification = json.loads(notification_output.read_text(encoding="utf-8"))
+            slack_text = notification["slack_text"]
+            zulip_text = notification["zulip_text"]
+
+        self.assertIn("- *Repository:* `target/repo`", slack_text)
+        self.assertIn("<https://github.example/target/repo/commit/abc123|abc123>", slack_text)
+        self.assertIn("[abc123](https://github.example/target/repo/commit/abc123)", zulip_text)
+        self.assertIn(
+            "- *GitHub Actions run:* <https://github.example/owner/workflow-runner/actions/runs/12345|open run>",
+            slack_text,
+        )
+
 
 class NotificationScriptTests(unittest.TestCase):
     def test_zulip_webhook_uses_slack_compatible_text_payload(self):
