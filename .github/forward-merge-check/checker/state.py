@@ -133,13 +133,6 @@ def notification_reasons(previous: Optional[dict], state: dict) -> list[Notifica
         if previous.get("health_fingerprint") != state.get("health_fingerprint"):
             reasons.append(NotificationReason.HEALTH_CHANGED)
 
-    if (
-        previous.get("chain_fingerprint") != state.get("chain_fingerprint")
-        and NotificationReason.CHAIN_CHANGED not in reasons
-        and new_status == "broken"
-    ):
-        reasons.append(NotificationReason.CHAIN_CHANGED)
-
     return reasons
 
 

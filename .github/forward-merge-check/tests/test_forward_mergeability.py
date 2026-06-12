@@ -364,8 +364,20 @@ class StateTests(unittest.TestCase):
         changed_broken = {
             "status": "broken",
             "config_fingerprint": "cfg",
-            "chain_fingerprint": "chain-b",
+            "chain_fingerprint": "chain-a",
             "health_fingerprint": "health-b",
+        }
+        same_broken_new_heads = {
+            "status": "broken",
+            "config_fingerprint": "cfg",
+            "chain_fingerprint": "chain-b",
+            "health_fingerprint": "health-a",
+        }
+        config_changed_broken = {
+            "status": "broken",
+            "config_fingerprint": "cfg-b",
+            "chain_fingerprint": "chain-b",
+            "health_fingerprint": "health-a",
         }
 
         self.assertIn(
@@ -378,7 +390,11 @@ class StateTests(unittest.TestCase):
         )
         self.assertIn(
             check.NotificationReason.CHAIN_CHANGED,
-            check.notification_reasons(previous_broken, changed_broken),
+            check.notification_reasons(previous_broken, config_changed_broken),
+        )
+        self.assertEqual(
+            check.notification_reasons(previous_broken, same_broken_new_heads),
+            [],
         )
 
     def test_write_outputs_writes_compact_state_notification_and_github_outputs(self):
