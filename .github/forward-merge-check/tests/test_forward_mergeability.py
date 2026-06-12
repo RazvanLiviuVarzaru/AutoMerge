@@ -351,32 +351,29 @@ class StateTests(unittest.TestCase):
     def test_resolution_and_health_change_reasons(self):
         previous_broken = {
             "status": "broken",
+            "branch_heads": {"old": "a", "next": "b"},
             "config_fingerprint": "cfg",
-            "chain_fingerprint": "chain-a",
             "health_fingerprint": "health-a",
         }
         resolved = {
             "status": "healthy",
             "config_fingerprint": "cfg",
-            "chain_fingerprint": "chain-b",
             "health_fingerprint": "health-b",
         }
         changed_broken = {
             "status": "broken",
             "config_fingerprint": "cfg",
-            "chain_fingerprint": "chain-a",
             "health_fingerprint": "health-b",
         }
         same_broken_new_heads = {
             "status": "broken",
+            "branch_heads": {"old": "new-a", "next": "new-b"},
             "config_fingerprint": "cfg",
-            "chain_fingerprint": "chain-b",
             "health_fingerprint": "health-a",
         }
         config_changed_broken = {
             "status": "broken",
             "config_fingerprint": "cfg-b",
-            "chain_fingerprint": "chain-b",
             "health_fingerprint": "health-a",
         }
 
@@ -415,7 +412,6 @@ class StateTests(unittest.TestCase):
                 "branches": ["old", "next", "main"],
                 "branch_heads": {"old": "a", "next": "b", "main": "c"},
                 "config_fingerprint": "cfg",
-                "chain_fingerprint": "chain",
                 "health_fingerprint": "health",
                 "results": [
                     {
@@ -535,7 +531,6 @@ class StateTests(unittest.TestCase):
                 "branches": ["old", "next"],
                 "branch_heads": {"old": "a", "next": "b"},
                 "config_fingerprint": "cfg",
-                "chain_fingerprint": "chain",
                 "health_fingerprint": "health",
                 "results": [
                     {

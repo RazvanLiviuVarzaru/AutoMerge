@@ -34,7 +34,6 @@ def write_outputs(args: argparse.Namespace, state: dict, reasons: list[Notificat
             output.write(f"status={state['status']}\n")
             output.write(f"should_notify={'true' if reasons else 'false'}\n")
             output.write(f"health_fingerprint={state['health_fingerprint']}\n")
-            output.write(f"chain_fingerprint={state['chain_fingerprint']}\n")
 
 
 def print_result(result: MergeResult) -> None:

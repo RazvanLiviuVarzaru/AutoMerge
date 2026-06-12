@@ -59,10 +59,6 @@ def current_state(repo: Path, branches: list[str], base_branch: str, results: li
         "branches": branches,
         "base_branch": base_branch,
     }
-    chain_payload = {
-        **config_payload,
-        "branch_heads": branch_heads,
-    }
     health_payload = {
         "status": status,
         "blocked_edge": None if blocked is None else [blocked.source_label, blocked.target],
@@ -88,7 +84,6 @@ def current_state(repo: Path, branches: list[str], base_branch: str, results: li
         "branches": branches,
         "branch_heads": branch_heads,
         "config_fingerprint": fingerprint(config_payload),
-        "chain_fingerprint": fingerprint(chain_payload),
         "health_fingerprint": fingerprint(health_payload),
         "results": [result_to_dict(result) for result in results],
     }
@@ -145,7 +140,6 @@ def compact_state(state: dict) -> dict:
         "branches": state["branches"],
         "branch_heads": state["branch_heads"],
         "config_fingerprint": state["config_fingerprint"],
-        "chain_fingerprint": state["chain_fingerprint"],
         "health_fingerprint": state["health_fingerprint"],
         "results": [
             {
