@@ -488,26 +488,11 @@ class StateTests(unittest.TestCase):
             zulip_text,
         )
         self.assertIn("*Conflicted files (1):*\n```\n- file.txt\n```", slack_text)
-        self.assertIn("*Candidate commits touching conflicted files:*", slack_text)
-        self.assertIn("- *Source side (`old`):*", slack_text)
-        self.assertIn("- *Target side (`next`):*", slack_text)
-        self.assertIn(
-            "  - <https://github.example/owner/repo/commit/abc111222333|abc111222333> - source touched conflict",
-            slack_text,
-        )
-        self.assertIn("    Author: Source Tester <source@example.invalid>", slack_text)
-        self.assertIn(
-            "  - <https://github.example/owner/repo/commit/def111222333|def111222333> - target touched conflict",
-            slack_text,
-        )
-        self.assertIn(
-            "  - [abc111222333](https://github.example/owner/repo/commit/abc111222333) - source touched conflict",
-            zulip_text,
-        )
-        self.assertIn(
-            "  - [def111222333](https://github.example/owner/repo/commit/def111222333) - target touched conflict",
-            zulip_text,
-        )
+        self.assertNotIn("*Candidate commits touching conflicted files:*", slack_text)
+        self.assertNotIn("abc111222333", slack_text)
+        self.assertNotIn("def111222333", slack_text)
+        self.assertNotIn("abc111222333", zulip_text)
+        self.assertNotIn("def111222333", zulip_text)
         self.assertIn(
             "*Conflicted files (2):*\n```\n- other.txt\n- src/deep/path.cc\n```",
             slack_text,
