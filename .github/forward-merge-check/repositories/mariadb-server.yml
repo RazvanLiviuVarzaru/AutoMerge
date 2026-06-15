@@ -1,0 +1,22 @@
+name: MariaDB Server
+repository: MariaDB/server
+
+# Ordered from oldest/stablest to newest.
+base_branch: "10.6"
+
+branches:
+  - "10.6"
+  - "10.11"
+  - "11.4"
+  - "11.8"
+  - "12.3"
+  - "13.0"
+  - "main"
+
+notifications:
+  slack:
+    enabled: true
+    secret: SLACK_WEBHOOK_URL
+  zulip:
+    enabled: true
+    secret: ZULIP_WEBHOOK_URL

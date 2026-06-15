@@ -1,0 +1,25 @@
+name: Forward merge chain health
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chain-health:
+    uses: YOUR_ORG/forward-branch-merge-check/.github/workflows/forward-merge-chain-health.yml@main
+    with:
+      tool_repository: YOUR_ORG/forward-branch-merge-check
+      tool_ref: main
+      target_repository: YOUR_ORG/YOUR_TARGET_REPOSITORY
+      config_path: .github/forward-merge-check/repositories/mariadb-server.yml
+      state_cache_key: forward-merge-chain-state
+    secrets:
+      tool_repository_token: ${{ secrets.FORWARD_MERGE_CHECK_TOKEN }}
+      target_repository_token: ${{ secrets.TARGET_REPOSITORY_TOKEN }}
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      zulip_webhook_url: ${{ secrets.ZULIP_WEBHOOK_URL }}

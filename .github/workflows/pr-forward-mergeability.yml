@@ -1,0 +1,67 @@
+name: Reusable PR forward mergeability
+
+on:
+  workflow_call:
+    inputs:
+      tool_repository:
+        description: Repository that contains the forward-merge-check tool.
+        required: true
+        type: string
+      tool_ref:
+        description: Ref to checkout from the tool repository.
+        required: false
+        type: string
+        default: main
+      config_path:
+        description: Branch-chain config path inside the tool repository.
+        required: false
+        type: string
+        default: .github/forward-merge-check/repositories/mariadb-server.yml
+    secrets:
+      tool_repository_token:
+        description: Optional token for checking out a private tool repository.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  pr-forward-mergeability:
+    runs-on: ubuntu-latest
+    name: Check PR forward mergeability
+
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          path: target
+
+      - name: Checkout forward-merge-check tool
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.tool_repository }}
+          ref: ${{ inputs.tool_ref }}
+          path: tool
+          token: ${{ secrets.tool_repository_token || github.token }}
+
+      - name: Fetch branch chain and PR head
+        run: |
+          python3 tool/.github/forward-merge-check/scripts/check_forward_mergeability.py \
+            --config-file "tool/${{ inputs.config_path }}" \
+            --print-branches |
+          while IFS= read -r branch; do
+            git -C target fetch --no-tags origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+          done
+
+          git -C target fetch --no-tags origin \
+            "${{ github.event.pull_request.head.sha }}:refs/pr/head"
+
+      - name: Test PR forward mergeability
+        run: |
+          python3 tool/.github/forward-merge-check/scripts/check_forward_mergeability.py \
+            --repo target \
+            --mode pr \
+            --config-file "tool/${{ inputs.config_path }}" \
+            --base-branch "${{ github.event.pull_request.base.ref }}" \
+            --pr-ref refs/pr/head
