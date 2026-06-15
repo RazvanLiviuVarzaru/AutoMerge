@@ -1,0 +1,26 @@
+name: MariaDB Server Forward merge chain health
+
+on:
+
+  schedule:
+    - cron: "39 */3 * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chain-health:
+    uses: MariaDB/AutoMerge/.github/workflows/forward-merge-chain-health.yml@main
+    with:
+      tool_repository: MariaDB/AutoMerge
+      tool_ref: main
+      target_repository: MariaDB/server
+      config_path: .github/forward-merge-check/repositories/mariadb-server.yml
+      state_cache_key: forward-merge-chain-state
+    secrets:
+      tool_repository_token: ${{ secrets.FORWARD_MERGE_CHECK_TOKEN }}
+      target_repository_token: ${{ secrets.TARGET_REPOSITORY_TOKEN }}
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      zulip_webhook_url: ${{ secrets.ZULIP_WEBHOOK_URL }}
